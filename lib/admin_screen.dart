@@ -1,5 +1,5 @@
 import 'dart:convert';
-
+import 'admin_resources_tab.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -31,7 +31,7 @@ class AdminScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Admin'),
@@ -45,6 +45,7 @@ class AdminScreen extends StatelessWidget {
             tabs: [
               Tab(text: 'Hotlines'),
               Tab(text: 'Counselors'),
+              Tab(text: 'Resources'),
             ],
           ),
         ),
@@ -53,6 +54,7 @@ class AdminScreen extends StatelessWidget {
             children: [
               _HotlinesTab(),
               _CounselorsTab(),
+              AdminResourcesTab(),
             ],
           ),
         ),

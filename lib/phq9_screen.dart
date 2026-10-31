@@ -8,9 +8,11 @@ import 'config.dart';
 import 'crisis_check.dart';
 import 'emergency_screen.dart';
 import 'history_screen.dart';
+import 'resources_screen.dart';
+import 'welcome_screen.dart';
 
-// Wording follows the standard PHQ-9. Your guidance counselor should
-// confirm the exact text (and any translation) before real use.
+// Wording follows the standard PHQ-9 and GAD-7. Your guidance counselor
+// should confirm the exact text (and any translation) before real use.
 const List<String> phq9Questions = [
   'Little interest or pleasure in doing things',
   'Feeling down, depressed, or hopeless',
@@ -21,6 +23,16 @@ const List<String> phq9Questions = [
   'Trouble concentrating on things, such as reading the newspaper or watching television',
   'Moving or speaking so slowly that other people could have noticed, or the opposite: being so fidgety or restless that you have been moving around a lot more than usual',
   'Thoughts that you would be better off dead, or of hurting yourself in some way',
+];
+
+const List<String> gad7Questions = [
+  'Feeling nervous, anxious, or on edge',
+  'Not being able to stop or control worrying',
+  'Worrying too much about different things',
+  'Trouble relaxing',
+  'Being so restless that it is hard to sit still',
+  'Becoming easily annoyed or irritable',
+  'Feeling afraid, as if something awful might happen',
 ];
 
 const List<String> answerLabels = [
@@ -54,21 +66,26 @@ class _Phq9ScreenState extends State<Phq9Screen> {
   final List<int> _answers = [];
   final ScrollController _scroll = ScrollController();
   final TextEditingController _controller = TextEditingController();
+  String? _test; // null until the user picks 'phq9' or 'gad7'
   int _current = 0;
   bool _finished = false;
+
+  List<String> get _questions =>
+      _test == 'gad7' ? gad7Questions : phq9Questions;
+
+  int get _maxScore => _questions.length * 3;
 
   @override
   void initState() {
     super.initState();
     _messages.add(const ChatMessage(
-      "Hi, I'm Kalinaw. You can type how you're feeling anytime, or answer a few questions. This is a screening, not a diagnosis.",
+      "Hi, I'm Kalinaw. You can type how you're feeling anytime, or take a short check. These are screenings, not a diagnosis.",
       false,
     ));
     _messages.add(const ChatMessage(
-      'Over the last 2 weeks, how often have you been bothered by:',
+      'Which check would you like to take?',
       false,
     ));
-    _messages.add(ChatMessage(phq9Questions[0], false));
   }
 
   @override
@@ -90,6 +107,39 @@ class _Phq9ScreenState extends State<Phq9Screen> {
       context,
       MaterialPageRoute(builder: (context) => const HistoryScreen()),
     );
+  }
+
+  void _openResources() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ResourcesScreen()),
+    );
+  }
+
+  // Logs out (if logged in) and returns to the welcome screen.
+  void _goToStart() {
+    AuthService.logout();
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+      (route) => false,
+    );
+  }
+
+  void _chooseTest(String test) {
+    setState(() {
+      _test = test;
+      _messages.add(ChatMessage(
+        test == 'phq9' ? 'Mood check (PHQ-9)' : 'Anxiety check (GAD-7)',
+        true,
+      ));
+      _messages.add(const ChatMessage(
+        'Over the last 2 weeks, how often have you been bothered by:',
+        false,
+      ));
+      _messages.add(ChatMessage(_questions[0], false));
+    });
+    _scrollToBottom();
   }
 
   Future<void> _sendText() async {
@@ -125,7 +175,7 @@ class _Phq9ScreenState extends State<Phq9Screen> {
       }
 
       final data = jsonDecode(response.body);
-      final bool crisis = data['crisis'];
+      final bool crisis = data['crisis'] == true;
 
       if (!mounted) return;
 
@@ -139,7 +189,7 @@ class _Phq9ScreenState extends State<Phq9Screen> {
           ));
         } else {
           _messages.add(const ChatMessage(
-            "Thank you for telling me. I'm listening. Whenever you're ready, you can keep answering the questions below.",
+            "Thank you for telling me. I'm listening. Whenever you're ready, you can continue with the check below.",
             false,
           ));
         }
@@ -169,8 +219,8 @@ class _Phq9ScreenState extends State<Phq9Screen> {
       _answers.add(value);
       _current++;
 
-      if (_current < phq9Questions.length) {
-        _messages.add(ChatMessage(phq9Questions[_current], false));
+      if (_current < _questions.length) {
+        _messages.add(ChatMessage(_questions[_current], false));
       } else {
         _finished = true;
       }
@@ -189,7 +239,7 @@ class _Phq9ScreenState extends State<Phq9Screen> {
 
     try {
       final response = await http.post(
-        Uri.parse('$backendUrl/screen/phq9'),
+        Uri.parse('$backendUrl/screen/$_test'),
         headers: AuthService.headers(),
         body: jsonEncode({'answers': _answers}),
       );
@@ -201,7 +251,7 @@ class _Phq9ScreenState extends State<Phq9Screen> {
       final data = jsonDecode(response.body);
       final int total = data['total'];
       final String level = data['level'];
-      final bool crisis = data['crisis'];
+      final bool crisis = data['crisis'] == true;
       final bool saved = data['saved'] == true;
 
       if (!mounted) return;
@@ -212,7 +262,7 @@ class _Phq9ScreenState extends State<Phq9Screen> {
         }
 
         _messages.add(ChatMessage(
-          'Your total score is $total out of 27. Level: $level.',
+          'Your total score is $total out of $_maxScore. Level: $level.',
           false,
         ));
 
@@ -304,6 +354,38 @@ class _Phq9ScreenState extends State<Phq9Screen> {
     );
   }
 
+  Widget _choiceButtons() {
+    if (_finished) return const SizedBox.shrink();
+
+    final List<Widget> buttons;
+
+    if (_test == null) {
+      buttons = [
+        ElevatedButton(
+          onPressed: () => _chooseTest('phq9'),
+          child: const Text('Mood check (PHQ-9)'),
+        ),
+        ElevatedButton(
+          onPressed: () => _chooseTest('gad7'),
+          child: const Text('Anxiety check (GAD-7)'),
+        ),
+      ];
+    } else {
+      buttons = [
+        for (int i = 0; i < answerLabels.length; i++)
+          ElevatedButton(
+            onPressed: () => _answer(i),
+            child: Text(answerLabels[i]),
+          ),
+      ];
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: Wrap(spacing: 8, runSpacing: 8, children: buttons),
+    );
+  }
+
   Widget _inputBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -341,16 +423,30 @@ class _Phq9ScreenState extends State<Phq9Screen> {
       appBar: AppBar(
         title: const Text('Kalinaw'),
         actions: [
-          if (AuthService.loggedIn)
-            IconButton(
-              icon: const Icon(Icons.history),
-              tooltip: 'My history',
-              onPressed: _openHistory,
-            ),
           TextButton.icon(
             onPressed: _openEmergency,
             icon: const Icon(Icons.favorite),
             label: const Text('Get help'),
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'resources') {
+                _openResources();
+              } else if (value == 'history') {
+                _openHistory();
+              } else if (value == 'start') {
+                _goToStart();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'resources', child: Text('Resources')),
+              if (AuthService.loggedIn)
+                const PopupMenuItem(value: 'history', child: Text('My history')),
+              PopupMenuItem(
+                value: 'start',
+                child: Text(AuthService.loggedIn ? 'Log out' : 'Back to start'),
+              ),
+            ],
           ),
         ],
       ),
@@ -365,21 +461,7 @@ class _Phq9ScreenState extends State<Phq9Screen> {
                 itemBuilder: (context, index) => _bubble(_messages[index]),
               ),
             ),
-            if (!_finished)
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (int i = 0; i < answerLabels.length; i++)
-                      ElevatedButton(
-                        onPressed: () => _answer(i),
-                        child: Text(answerLabels[i]),
-                      ),
-                  ],
-                ),
-              ),
+            _choiceButtons(),
             _inputBar(),
           ],
         ),
