@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'phq9_screen.dart';
+import 'welcome_screen.dart';
 
 void main() {
   runApp(
@@ -30,7 +31,7 @@ class KalinawApp extends StatelessWidget {
           seedColor: const Color(0xFF0F6B6B),
         ),
       ),
-      home: const HomeScreen(),
+      home: const  WelcomeScreen(),
     );
   }
 }

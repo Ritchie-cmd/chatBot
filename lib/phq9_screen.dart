@@ -1,4 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+import 'crisis_check.dart';
+import 'emergency_screen.dart';
+
+// Change this one line when the backend moves to a real server.
+const String backendUrl = 'http://127.0.0.1:8000';
 
 // Wording follows the standard PHQ-9. Your guidance counselor should
 // confirm the exact text (and any translation) before real use.
@@ -21,6 +30,11 @@ const List<String> answerLabels = [
   'Nearly every day',
 ];
 
+// This message must be reviewed by your guidance counselor before any
+// real student uses the app.
+const String crisisText =
+    "What you shared tells me you may be going through something very painful. You don't have to face it alone. Please reach out to someone you trust or a mental health professional right now. If you are in immediate danger, contact your local emergency services.";
+
 class ChatMessage {
   final String text;
   final bool fromUser;
@@ -39,6 +53,7 @@ class _Phq9ScreenState extends State<Phq9Screen> {
   final List<ChatMessage> _messages = [];
   final List<int> _answers = [];
   final ScrollController _scroll = ScrollController();
+  final TextEditingController _controller = TextEditingController();
   int _current = 0;
   bool _finished = false;
 
@@ -46,7 +61,7 @@ class _Phq9ScreenState extends State<Phq9Screen> {
   void initState() {
     super.initState();
     _messages.add(const ChatMessage(
-      "Hi, I'm Kalinaw. I'll ask a few questions about how you've been feeling. This is a screening, not a diagnosis.",
+      "Hi, I'm Kalinaw. You can type how you're feeling anytime, or answer a few questions. This is a screening, not a diagnosis.",
       false,
     ));
     _messages.add(const ChatMessage(
@@ -54,6 +69,91 @@ class _Phq9ScreenState extends State<Phq9Screen> {
       false,
     ));
     _messages.add(ChatMessage(phq9Questions[0], false));
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _openEmergency() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const EmergencyScreen()),
+    );
+  }
+
+  Future<void> _sendText() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+
+    _controller.clear();
+    setState(() {
+      _messages.add(ChatMessage(text, true));
+    });
+    _scrollToBottom();
+
+    // Step 1: check on the phone first. This works with no internet.
+    if (messageHasWarning(text)) {
+      setState(() {
+        _messages.add(const ChatMessage(crisisText, false));
+      });
+      _scrollToBottom();
+      _openEmergency();
+      return;
+    }
+
+    // Step 2: ask the backend, which may know more phrases later.
+    try {
+      final response = await http.post(
+        Uri.parse('$backendUrl/chat/check'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'message': text}),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Unexpected response: ${response.statusCode}');
+      }
+
+      final data = jsonDecode(response.body);
+      final bool crisis = data['crisis'];
+
+      if (!mounted) return;
+
+      setState(() {
+        if (crisis) {
+          _messages.add(const ChatMessage(crisisText, false));
+        } else if (_finished) {
+          _messages.add(const ChatMessage(
+            "Thank you for sharing that. If things feel heavy, it could help to talk with a guidance counselor.",
+            false,
+          ));
+        } else {
+          _messages.add(const ChatMessage(
+            "Thank you for telling me. I'm listening. Whenever you're ready, you can keep answering the questions below.",
+            false,
+          ));
+        }
+      });
+
+      if (crisis) {
+        _openEmergency();
+      }
+    } catch (error) {
+      print('Chat check error: $error');
+      if (!mounted) return;
+
+      setState(() {
+        _messages.add(const ChatMessage(
+          "I couldn't check your message right now. If you are in danger or need urgent help, please tap Get help at the top, or contact someone you trust or your local emergency services.",
+          false,
+        ));
+      });
+    }
+
+    _scrollToBottom();
   }
 
   void _answer(int value) {
@@ -66,12 +166,76 @@ class _Phq9ScreenState extends State<Phq9Screen> {
         _messages.add(ChatMessage(phq9Questions[_current], false));
       } else {
         _finished = true;
-        _messages.add(ChatMessage(
-          'Thank you for answering. Your answers: $_answers',
-          false,
-        ));
       }
     });
+    _scrollToBottom();
+
+    if (_finished) {
+      _submit();
+    }
+  }
+
+  Future<void> _submit() async {
+    setState(() {
+      _messages.add(const ChatMessage('Thank you. Calculating your result...', false));
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('$backendUrl/screen/phq9'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'answers': _answers}),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Unexpected response: ${response.statusCode}');
+      }
+
+      final data = jsonDecode(response.body);
+      final int total = data['total'];
+      final String level = data['level'];
+      final bool crisis = data['crisis'];
+
+      if (!mounted) return;
+
+      setState(() {
+        if (crisis) {
+          _messages.add(const ChatMessage(crisisText, false));
+        }
+
+        _messages.add(ChatMessage(
+          'Your total score is $total out of 27. Level: $level.',
+          false,
+        ));
+
+        if (total >= 10) {
+          _messages.add(const ChatMessage(
+            'A score at this level suggests it could help to talk with a guidance counselor or mental health professional. This screening is not a diagnosis.',
+            false,
+          ));
+        } else {
+          _messages.add(const ChatMessage(
+            'Your answers suggest few symptoms right now. Keep taking care of yourself, and check in again anytime. This screening is not a diagnosis.',
+            false,
+          ));
+        }
+      });
+
+      if (crisis) {
+        _openEmergency();
+      }
+    } catch (error) {
+      print('Submit error: $error');
+      if (!mounted) return;
+
+      setState(() {
+        _messages.add(const ChatMessage(
+          "Sorry, I couldn't reach the server to calculate your result. Please try again later.",
+          false,
+        ));
+      });
+    }
+
     _scrollToBottom();
   }
 
@@ -115,10 +279,50 @@ class _Phq9ScreenState extends State<Phq9Screen> {
     );
   }
 
+  Widget _inputBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _sendText(),
+              decoration: InputDecoration(
+                hintText: 'Type how you feel...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.send),
+            onPressed: _sendText,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Kalinaw')),
+      appBar: AppBar(
+        title: const Text('Kalinaw'),
+        actions: [
+          TextButton.icon(
+            onPressed: _openEmergency,
+            icon: const Icon(Icons.favorite),
+            label: const Text('Get help'),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -145,6 +349,7 @@ class _Phq9ScreenState extends State<Phq9Screen> {
                   ],
                 ),
               ),
+            _inputBar(),
           ],
         ),
       ),
