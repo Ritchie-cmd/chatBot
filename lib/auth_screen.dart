@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'auth_service.dart';
+import 'counselor_screen.dart';
 import 'phq9_screen.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -50,9 +51,7 @@ class _AuthScreenState extends State<AuthScreen> {
       error = await AuthService.login(email, password);
     } else {
       error = await AuthService.register(name, email, password);
-      if (error == null) {
-        error = await AuthService.login(email, password);
-      }
+      error ??= await AuthService.login(email, password);
     }
 
     if (!mounted) return;
@@ -65,9 +64,13 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
+    final Widget next = AuthService.isCounselor
+        ? const CounselorScreen()
+        : const Phq9Screen();
+
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => const Phq9Screen()),
+      MaterialPageRoute(builder: (context) => next),
       (route) => false,
     );
   }

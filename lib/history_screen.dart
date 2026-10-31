@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import 'auth_service.dart';
 import 'config.dart';
+import 'share_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -60,12 +61,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  void _openShare(int id) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => ShareScreen(resultId: id)),
+    );
+  }
+
   Future<void> _delete(int id) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete this result?'),
-        content: const Text('This removes it from your history for good.'),
+        content: const Text(
+          'This removes it from your history for good, and stops sharing it with any counselor.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -144,9 +154,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
             subtitle: Text(
               'Score ${item['total']}  |  ${_formatDate(item['created_at'])}',
             ),
-            trailing: IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: () => _delete(item['id']),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.share_outlined),
+                  tooltip: 'Share with a counselor',
+                  onPressed: () => _openShare(item['id']),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  tooltip: 'Delete',
+                  onPressed: () => _delete(item['id']),
+                ),
+              ],
             ),
           );
         },

@@ -8,8 +8,12 @@ import 'config.dart';
 // only for now. Before real use, store it with flutter_secure_storage.
 class AuthService {
   static String? token;
+  static String role = 'student';
+  static String name = '';
 
   static bool get loggedIn => token != null;
+
+  static bool get isCounselor => role == 'counselor';
 
   // Headers for requests to the backend. Adds the token when logged in.
   static Map<String, String> headers() {
@@ -51,6 +55,7 @@ class AuthService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         token = data['access_token'];
+        await loadProfile();
         return null;
       }
       return _errorMessage(response);
@@ -60,8 +65,28 @@ class AuthService {
     }
   }
 
+  // Asks the backend who we are, so the app knows the role.
+  static Future<void> loadProfile() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$backendUrl/auth/me'),
+        headers: headers(),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        role = data['role'] ?? 'student';
+        name = data['name'] ?? '';
+      }
+    } catch (error) {
+      print('Profile error: $error');
+    }
+  }
+
   static void logout() {
     token = null;
+    role = 'student';
+    name = '';
   }
 
   static String _errorMessage(http.Response response) {
