@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import 'phq9_screen.dart' show backendUrl;
+import 'config.dart';
 
 // Holds the login token while the app is open. The token is kept in memory
 // only for now. Before real use, store it with flutter_secure_storage.
@@ -10,6 +10,14 @@ class AuthService {
   static String? token;
 
   static bool get loggedIn => token != null;
+
+  // Headers for requests to the backend. Adds the token when logged in.
+  static Map<String, String> headers() {
+    return {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
 
   // Returns null when it worked, or an error message to show the user.
   static Future<String?> register(

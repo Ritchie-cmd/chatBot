@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import 'auth_service.dart';
+import 'config.dart';
 import 'crisis_check.dart';
 import 'emergency_screen.dart';
-
-// Change this one line when the backend moves to a real server.
-const String backendUrl = 'http://127.0.0.1:8000';
+import 'history_screen.dart';
 
 // Wording follows the standard PHQ-9. Your guidance counselor should
 // confirm the exact text (and any translation) before real use.
@@ -82,6 +82,13 @@ class _Phq9ScreenState extends State<Phq9Screen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const EmergencyScreen()),
+    );
+  }
+
+  void _openHistory() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const HistoryScreen()),
     );
   }
 
@@ -183,7 +190,7 @@ class _Phq9ScreenState extends State<Phq9Screen> {
     try {
       final response = await http.post(
         Uri.parse('$backendUrl/screen/phq9'),
-        headers: {'Content-Type': 'application/json'},
+        headers: AuthService.headers(),
         body: jsonEncode({'answers': _answers}),
       );
 
@@ -195,6 +202,7 @@ class _Phq9ScreenState extends State<Phq9Screen> {
       final int total = data['total'];
       final String level = data['level'];
       final bool crisis = data['crisis'];
+      final bool saved = data['saved'] == true;
 
       if (!mounted) return;
 
@@ -216,6 +224,23 @@ class _Phq9ScreenState extends State<Phq9Screen> {
         } else {
           _messages.add(const ChatMessage(
             'Your answers suggest few symptoms right now. Keep taking care of yourself, and check in again anytime. This screening is not a diagnosis.',
+            false,
+          ));
+        }
+
+        if (saved) {
+          _messages.add(const ChatMessage(
+            'Your result was saved to your history. You can delete it anytime.',
+            false,
+          ));
+        } else if (AuthService.loggedIn) {
+          _messages.add(const ChatMessage(
+            "I couldn't save this result. Your login may have expired. Please log in again.",
+            false,
+          ));
+        } else {
+          _messages.add(const ChatMessage(
+            'You are in guest mode, so this result was not saved.',
             false,
           ));
         }
@@ -316,6 +341,12 @@ class _Phq9ScreenState extends State<Phq9Screen> {
       appBar: AppBar(
         title: const Text('Kalinaw'),
         actions: [
+          if (AuthService.loggedIn)
+            IconButton(
+              icon: const Icon(Icons.history),
+              tooltip: 'My history',
+              onPressed: _openHistory,
+            ),
           TextButton.icon(
             onPressed: _openEmergency,
             icon: const Icon(Icons.favorite),
