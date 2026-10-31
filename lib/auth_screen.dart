@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'admin_screen.dart';
 
 import 'auth_service.dart';
 import 'counselor_screen.dart';
@@ -64,9 +65,14 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
-    final Widget next = AuthService.isCounselor
-        ? const CounselorScreen()
-        : const Phq9Screen();
+        final Widget next;
+    if (AuthService.isAdmin) {
+      next = const AdminScreen();
+    } else if (AuthService.isCounselor) {
+      next = const CounselorScreen();
+    } else {
+      next = const Phq9Screen();
+    }
 
     Navigator.pushAndRemoveUntil(
       context,

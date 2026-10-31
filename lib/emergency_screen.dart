@@ -1,9 +1,31 @@
 import 'package:flutter/material.dart';
 
+import 'hotline_service.dart';
 import 'hotlines.dart';
 
-class EmergencyScreen extends StatelessWidget {
+class EmergencyScreen extends StatefulWidget {
   const EmergencyScreen({super.key});
+
+  @override
+  State<EmergencyScreen> createState() => _EmergencyScreenState();
+}
+
+class _EmergencyScreenState extends State<EmergencyScreen> {
+  List<Hotline> _items = HotlineService.current;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Show what we have right away, then refresh in the background.
+    HotlineService.load().then((list) {
+      if (mounted) {
+        setState(() {
+          _items = list;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +46,7 @@ class EmergencyScreen extends StatelessWidget {
               'Reaching out is a strong thing to do. You can also tell someone you trust, like a family member, a friend or a teacher, and ask them to stay with you.',
             ),
             const SizedBox(height: 24),
-            for (final hotline in hotlines)
+            for (final hotline in _items)
               Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 child: Padding(
@@ -45,8 +67,10 @@ class EmergencyScreen extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(hotline.note),
+                      if (hotline.note.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(hotline.note),
+                      ],
                     ],
                   ),
                 ),

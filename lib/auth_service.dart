@@ -14,6 +14,7 @@ class AuthService {
   static bool get loggedIn => token != null;
 
   static bool get isCounselor => role == 'counselor';
+  static bool get isAdmin => role == 'admin';
 
   // Headers for requests to the backend. Adds the token when logged in.
   static Map<String, String> headers() {
