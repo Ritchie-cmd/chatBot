@@ -1,8 +1,8 @@
-// A copy of the warning phrases that lives inside the app, so the scan
-// still works with no internet. Keep it in sync with WARNING_PHRASES in
-// backend/app/core/crisis.py. The final list (including Bisaya, Waray and
-// Tagalog phrases) must be written and checked by your guidance counselor
-// and native speakers.
+import 'phrase_service.dart';
+
+// Built-in English phrases. They are always checked. Phrases that the admin
+// added in the app are checked too (see PhraseService). Keep this list in
+// sync with WARNING_PHRASES in backend/app/core/crisis.py.
 const List<String> warningPhrases = [
   'kill myself',
   'suicide',
@@ -13,7 +13,7 @@ const List<String> warningPhrases = [
 bool messageHasWarning(String message) {
   final text = message.toLowerCase();
 
-  for (final phrase in warningPhrases) {
+  for (final phrase in [...warningPhrases, ...PhraseService.extra]) {
     if (text.contains(phrase)) {
       return true;
     }

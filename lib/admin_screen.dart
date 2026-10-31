@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 import 'config.dart';
 import 'welcome_screen.dart';
+import 'admin_phrases_tab.dart';
 
 String _detail(http.Response response, String fallback) {
   try {
@@ -31,7 +32,7 @@ class AdminScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Admin'),
@@ -41,21 +42,24 @@ class AdminScreen extends StatelessWidget {
               child: const Text('Log out'),
             ),
           ],
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Hotlines'),
-              Tab(text: 'Counselors'),
-              Tab(text: 'Resources'),
-            ],
-          ),
+             bottom: const TabBar(
+     isScrollable: true,
+     tabs: [
+       Tab(text: 'Hotlines'),
+       Tab(text: 'Counselors'),
+       Tab(text: 'Resources'),
+       Tab(text: 'Phrases'),
+     ],
+   ),
         ),
         body: const SafeArea(
           child: TabBarView(
-            children: [
-              _HotlinesTab(),
-              _CounselorsTab(),
-              AdminResourcesTab(),
-            ],
+               children: [
+     _HotlinesTab(),
+     _CounselorsTab(),
+     AdminResourcesTab(),
+     AdminPhrasesTab(),
+   ],
           ),
         ),
       ),
